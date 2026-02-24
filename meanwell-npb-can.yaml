@@ -1,7 +1,6 @@
 esphome:
   name: meanwell-npb-can
   friendly_name: MeanWell NPB CAN
-  min_version: 2025.9.0
   name_add_mac_suffix: false
 
 esp32:
@@ -14,8 +13,7 @@ logger:
 ota:
   - platform: esphome
 
-api:
-
+# Без пароля к твоему Wi-Fi: сначала поднимется AP, введёшь Wi-Fi через captive portal
 wifi:
   ap:
     ssid: "NPB-CAN-Setup"
@@ -27,89 +25,30 @@ web_server:
   port: 80
 
 # ---------------- MeanWell NPB over CAN ----------------
-substitutions:
-  mw_can_tx_id: "0xC0103"   # master->charger (write/read requests)
-  mw_can_rx_id: "0xC0003"   # charger->master (responses)
-  mw_node_id:   "0xC0003"   # required by ESPHome canbus component
-  can_rx_pin: "GPIO6"       # CRX
-  can_tx_pin: "GPIO7"       # CTX
-
+# Master -> Charger: 0xC0103
+# Charger -> Master: 0xC0003
 globals:
-  - id: mw_curve_config_low
+  - id: mw_curve_low
     type: uint8_t
     restore_value: no
-    initial_value: '0x80'   # default: Charger mode (CUVE=1)
-  - id: mw_curve_config_high
+    initial_value: '0x80'   # bit7=1 (charger) по умолчанию
+
+  - id: mw_curve_high
     type: uint8_t
     restore_value: no
     initial_value: '0x00'
 
-  - id: mw_system_config_low
+  - id: mw_sys_low
     type: uint8_t
     restore_value: no
     initial_value: '0x03'
-  - id: mw_system_config_high
+
+  - id: mw_sys_high
     type: uint8_t
     restore_value: no
-    initial_value: '0x04'   # default: EEP_OFF=1 (write to EEPROM disabled)
+    initial_value: '0x04'   # bit 0x04 = disable write to eeprom (как в исходном проекте)
 
-script:
-  - id: npb_poll
-    mode: queued
-    then:
-      # OPERATION / status
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0x00, 0x00] }
-      - delay: 40ms
-
-      # PSU setpoints (also useful to show what charger accepted)
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0x20, 0x00] } # VOUT_SET read
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0x30, 0x00] } # IOUT_SET read
-      - delay: 40ms
-
-      # Fault / live measurements
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0x40, 0x00] } # FAULT_STATUS
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0x60, 0x00] } # READ_VOUT
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0x61, 0x00] } # READ_IOUT
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0x62, 0x00] } # READ_TEMPERATURE_1
-      - delay: 40ms
-
-      # Charger curve values
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB0, 0x00] } # CURVE_CC
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB1, 0x00] } # CURVE_CV
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB2, 0x00] } # CURVE_FV
-      - delay: 40ms
-
-      # Charger curve config + timeouts + status + restart voltage
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB4, 0x00] } # CURVE_CONFIG
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB5, 0x00] } # CURVE_CC_TIMEOUT
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB6, 0x00] } # CURVE_CV_TIMEOUT
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB7, 0x00] } # CURVE_FV_TIMEOUT
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB8, 0x00] } # CHG_STATUS
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xB9, 0x00] } # CHG_RST_VBAT
-      - delay: 40ms
-
-      # System status/config
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xC1, 0x00] } # SYSTEM_STATUS
-      - delay: 40ms
-      - canbus.send: { use_extended_id: true, can_id: ${mw_can_tx_id}, data: [0xC2, 0x00] } # SYSTEM_CONFIG
-
-interval:
-  - interval: 1s
-    then:
-      - script.execute: npb_poll
-
-# ---------------- UI: live measurements ----------------
+# ---------------- UI: measurements ----------------
 sensor:
   - platform: template
     name: "Measured output voltage"
@@ -135,10 +74,65 @@ sensor:
     state_class: measurement
     accuracy_decimals: 1
 
-# ---------------- UI: Charger controls (curve / timeouts / restart) ----------------
+  - platform: template
+    name: "Target voltage (accepted)"
+    id: mw_target_voltage_accepted
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "Target current (accepted)"
+    id: mw_target_current_accepted
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+
+# ---------------- UI: controls ----------------
+switch:
+  - platform: template
+    name: "Charger ON/OFF"
+    id: mw_power
+    optimistic: true
+    turn_on_action:
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x00, 0x00, 0x01]
+    turn_off_action:
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x00, 0x00, 0x00]
+
+  - platform: template
+    name: "EEPROM write enabled"
+    id: mw_eeprom_write_enabled
+    optimistic: true
+    turn_on_action:
+      # enable write => clear 0x04 in high byte
+      - lambda: |-
+          id(mw_sys_high) = (uint8_t)(id(mw_sys_high) & ~0x04);
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: !lambda |-
+            return {0xC2, 0x00, id(mw_sys_low), id(mw_sys_high)};
+    turn_off_action:
+      # disable write => set 0x04 in high byte
+      - lambda: |-
+          id(mw_sys_high) = (uint8_t)(id(mw_sys_high) | 0x04);
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: !lambda |-
+            return {0xC2, 0x00, id(mw_sys_low), id(mw_sys_high)};
+
 select:
   - platform: template
-    name: "Mode"
+    name: "Mode (Charger/PSU)"
     id: mw_mode
     optimistic: true
     options:
@@ -147,187 +141,17 @@ select:
     initial_option: "Charger"
     set_action:
       - lambda: |-
-          // CUVE bit7 in low byte: 1=Charger, 0=PSU
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-
-          if (x == "Charger") low |= 0x80;
-          else low &= ~0x80;
-
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-
+          // CUVE = bit7 low byte (1=Charger, 0=PSU)
+          if (x == "Charger") id(mw_curve_low) = (uint8_t)(id(mw_curve_low) | 0x80);
+          else id(mw_curve_low) = (uint8_t)(id(mw_curve_low) & ~0x80);
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)};
-
-switch:
-  - platform: template
-    name: "Charger ON/OFF"
-    id: mw_output_enable
-    optimistic: true
-    turn_on_action:
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: [0x00, 0x00, 0x01]
-    turn_off_action:
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: [0x00, 0x00, 0x00]
-
-  - platform: template
-    name: "EEPROM write enabled"
-    id: mw_eeprom_write_enabled
-    optimistic: true
-    turn_on_action:
-      - lambda: |-
-          // EEP_OFF is bit2 of high byte: 0=write enabled, 1=write disabled
-          uint8_t low = id(mw_system_config_low);
-          uint8_t high = id(mw_system_config_high);
-          high &= ~0x04; // clear EEP_OFF
-          id(mw_system_config_low) = low;
-          id(mw_system_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xC2, 0x00, id(mw_system_config_low), id(mw_system_config_high)}
-    turn_off_action:
-      - lambda: |-
-          uint8_t low = id(mw_system_config_low);
-          uint8_t high = id(mw_system_config_high);
-          high |= 0x04; // set EEP_OFF
-          id(mw_system_config_low) = low;
-          id(mw_system_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xC2, 0x00, id(mw_system_config_low), id(mw_system_config_high)}
-
-  - platform: template
-    name: "Recharge restart enable (RSTE)"
-    id: mw_restart_enable
-    optimistic: true
-    turn_on_action:
-      - lambda: |-
-          // RSTE is bit3 of CURVE_CONFIG high byte
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-          high |= 0x08;
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)}
-    turn_off_action:
-      - lambda: |-
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-          high &= ~0x08;
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)}
-
-  - platform: template
-    name: "CC timeout enable (CCTOE)"
-    id: mw_cc_timeout_enable
-    optimistic: true
-    turn_on_action:
-      - lambda: |-
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-          high |= 0x01;
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)}
-    turn_off_action:
-      - lambda: |-
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-          high &= ~0x01;
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)}
-
-  - platform: template
-    name: "CV timeout enable (CVTOE)"
-    id: mw_cv_timeout_enable
-    optimistic: true
-    turn_on_action:
-      - lambda: |-
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-          high |= 0x02;
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)}
-    turn_off_action:
-      - lambda: |-
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-          high &= ~0x02;
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)}
-
-  - platform: template
-    name: "FV timeout enable (FVTOE)"
-    id: mw_fv_timeout_enable
-    optimistic: true
-    turn_on_action:
-      - lambda: |-
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-          high |= 0x04;
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)}
-    turn_off_action:
-      - lambda: |-
-          uint8_t low = id(mw_curve_config_low);
-          uint8_t high = id(mw_curve_config_high);
-          high &= ~0x04;
-          id(mw_curve_config_low) = low;
-          id(mw_curve_config_high) = high;
-      - canbus.send:
-          use_extended_id: true
-          can_id: ${mw_can_tx_id}
-          data: !lambda |-
-            return {0xB4, 0x00, id(mw_curve_config_low), id(mw_curve_config_high)}
+            return {0xB4, 0x00, id(mw_curve_low), id(mw_curve_high)};
 
 number:
-  # Charger curve
+  # --- Charger curve ---
   - platform: template
     name: "Curve CC current"
     id: mw_curve_cc
@@ -339,10 +163,10 @@ number:
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x * 100.0f + 0.5f);  // F=0.01
-            return {0xB0, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) (x * 100.0);
+            return {0xB0, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
   - platform: template
     name: "Curve CV voltage"
@@ -355,10 +179,10 @@ number:
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x * 100.0f + 0.5f);  // F=0.01
-            return {0xB1, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) (x * 100.0);
+            return {0xB1, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
   - platform: template
     name: "Curve Float voltage"
@@ -371,14 +195,14 @@ number:
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x * 100.0f + 0.5f);  // F=0.01
-            return {0xB2, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) (x * 100.0);
+            return {0xB2, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
   - platform: template
     name: "Recharge restart voltage"
-    id: mw_chg_rst_vbat
+    id: mw_restart_v
     unit_of_measurement: "V"
     optimistic: true
     min_value: 0
@@ -387,64 +211,64 @@ number:
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x * 100.0f + 0.5f);  // F=0.01
-            return {0xB9, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) (x * 100.0);
+            return {0xB9, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
-  # Timeouts (minutes)
+  # --- Timeouts (минуты: пишем целым числом) ---
   - platform: template
     name: "CC timeout (min)"
-    id: mw_cc_timeout_min
+    id: mw_cc_timeout
     unit_of_measurement: "min"
     optimistic: true
     min_value: 0
-    max_value: 64800
+    max_value: 65535
     step: 1
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x + 0.5f);
-            return {0xB5, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) x;
+            return {0xB5, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
   - platform: template
     name: "CV timeout (min)"
-    id: mw_cv_timeout_min
+    id: mw_cv_timeout
     unit_of_measurement: "min"
     optimistic: true
     min_value: 0
-    max_value: 64800
+    max_value: 65535
     step: 1
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x + 0.5f);
-            return {0xB6, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) x;
+            return {0xB6, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
   - platform: template
     name: "FV timeout (min)"
-    id: mw_fv_timeout_min
+    id: mw_fv_timeout
     unit_of_measurement: "min"
     optimistic: true
     min_value: 0
-    max_value: 64800
+    max_value: 65535
     step: 1
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x + 0.5f);
-            return {0xB7, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) x;
+            return {0xB7, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
-  # ---------------- UI: PSU controls (nice-to-have) ----------------
+  # --- PSU (дополнение) ---
   - platform: template
-    name: "Target Voltage"
-    id: mw_target_voltage
+    name: "Target Voltage (PSU)"
+    id: mw_target_v
     unit_of_measurement: "V"
     optimistic: true
     min_value: 0
@@ -453,14 +277,14 @@ number:
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x * 100.0f + 0.5f);  // 0.01V
-            return {0x20, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) (x * 100.0);
+            return {0x20, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
   - platform: template
-    name: "Target Current"
-    id: mw_target_current
+    name: "Target Current (PSU)"
+    id: mw_target_i
     unit_of_measurement: "A"
     optimistic: true
     min_value: 0
@@ -469,134 +293,112 @@ number:
     set_action:
       - canbus.send:
           use_extended_id: true
-          can_id: ${mw_can_tx_id}
+          can_id: 0xC0103
           data: !lambda |-
-            int v = (int) (x * 100.0f + 0.5f);  // 0.01A
-            return {0x30, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
+            int v = (int) (x * 100.0);
+            return {0x30, 0x00, (uint8_t)(v % 256), (uint8_t)(v / 256)};
 
-# ---------------- UI: flags / states ----------------
+# ---------------- UI: flags (как в базовом проекте) ----------------
 binary_sensor:
-  # Fault status (0x0040)
+  # FAULT_STATUS (0x0040) low byte x[2]
   - platform: template
-    name: "FAULT: Fan fail"
-    id: mw_fault_fan_fail
+    name: "FAULT: over temperature"
+    id: mw_over_temperature
   - platform: template
-    name: "FAULT: OTP (over-temp)"
-    id: mw_fault_otp
+    name: "FAULT: output over voltage"
+    id: mw_output_over_voltage
   - platform: template
-    name: "FAULT: OVP (over-voltage)"
-    id: mw_fault_ovp
+    name: "FAULT: output over current"
+    id: mw_output_over_current
   - platform: template
-    name: "FAULT: OLP (over-current)"
-    id: mw_fault_olp
+    name: "FAULT: output short circuited"
+    id: mw_output_short
   - platform: template
-    name: "FAULT: SHORT"
-    id: mw_fault_short
+    name: "FAULT: AC abnormal"
+    id: mw_ac_abnormal
   - platform: template
-    name: "FAULT: AC_FAIL"
-    id: mw_fault_ac_fail
+    name: "FAULT: output turned off"
+    id: mw_output_turned_off
   - platform: template
-    name: "FAULT: OP_OFF"
-    id: mw_fault_op_off
-  - platform: template
-    name: "FAULT: HI_TEMP"
-    id: mw_fault_hi_temp
+    name: "FAULT: internal temperature abnormal"
+    id: mw_internal_temperature_abnormal
 
-  # Charge status (0x00B8)
+  # CHG_STATUS (0x00B8): low x[2], high x[3]
   - platform: template
-    name: "CHG: Fully charged"
-    id: mw_chg_fully_charged
+    name: "CHG: fully charged"
+    id: mw_fully_charged
   - platform: template
-    name: "CHG: CC mode"
-    id: mw_chg_cc_mode
+    name: "CHG: wake up unfinished"
+    id: mw_wake_up_unfinished
   - platform: template
-    name: "CHG: CV mode"
-    id: mw_chg_cv_mode
+    name: "CHG: temperature compensation short circuited"
+    id: mw_temp_comp_short
   - platform: template
-    name: "CHG: FV mode"
-    id: mw_chg_fv_mode
-  - platform: template
-    name: "CHG: Wakeup unfinished"
-    id: mw_chg_wakeup_unfinished
-  - platform: template
-    name: "CHG: NTC short (NTCER)"
-    id: mw_chg_ntc_error
-  - platform: template
-    name: "CHG: No battery detected (BTNC)"
-    id: mw_chg_no_battery
-  - platform: template
-    name: "CHG: CC timeout flag (CCTOF)"
-    id: mw_chg_cctof
-  - platform: template
-    name: "CHG: CV timeout flag (CVTOF)"
-    id: mw_chg_cvtof
-  - platform: template
-    name: "CHG: FV timeout flag (FVTOF)"
-    id: mw_chg_fvtof
+    name: "CHG: no battery detected"
+    id: mw_no_battery
 
-  # System status (0x00C1)
+  # SYSTEM_STATUS (0x00C1): x[2]
   - platform: template
-    name: "SYS: DC output OK (DC_OK)"
-    id: mw_sys_dc_ok
+    name: "SYS: DC output normal range"
+    id: mw_dc_output_normal
   - platform: template
-    name: "SYS: Initial state"
-    id: mw_sys_initial_state
+    name: "SYS: initial state"
+    id: mw_initial_state
   - platform: template
-    name: "SYS: EEPROM access error (EEPER)"
-    id: mw_sys_eep_error
+    name: "SYS: eeprom access error"
+    id: mw_eeprom_access_error
 
-  # Mode/config reflections
+  # Mode/config
   - platform: template
-    name: "CFG: Charger mode (CUVE)"
-    id: mw_cfg_charger_mode
+    name: "CFG: charger mode (CUVE)"
+    id: mw_charger_mode
   - platform: template
-    name: "CFG: EEPROM write disabled (EEP_OFF)"
-    id: mw_cfg_eep_off
+    name: "CFG: disable write to eeprom"
+    id: mw_disable_write_to_eeprom
 
 # ---------------- CAN interface + parser ----------------
 canbus:
   - platform: esp32_can
-    tx_pin: ${can_tx_pin}
-    rx_pin: ${can_rx_pin}
-    can_id: ${mw_node_id}
+    tx_pin: GPIO7     # CTX
+    rx_pin: GPIO6     # CRX
+    can_id: 0xC0103
     use_extended_id: true
     bit_rate: 250kbps
 
     on_frame:
-      - can_id: ${mw_can_rx_id}
+      - can_id: 0xC0003
         use_extended_id: true
         then:
           - lambda: |-
-              // Protocol: x[0]=reg low byte, x[1]=reg high byte, x[2]=data LSB, x[3]=data MSB (for 2-byte responses)
               switch (x[0]) {
-
-                case 0x00: { // OPERATION readback
-                  id(mw_output_enable).publish_state(x[2] != 0);
+                case 0x00: { // OPERATION
+                  id(mw_power).publish_state(x.size() > 2 && x[2] != 0);
                   break;
                 }
 
-                case 0x20: { // VOUT_SET
+                case 0x20: { // VOUT_SET (accepted)
                   float v = 0.01f * ((float)x[2] + 256.0f * (float)x[3]);
-                  id(mw_target_voltage).publish_state(v);
+                  id(mw_target_voltage_accepted).publish_state(v);
+                  id(mw_target_v).publish_state(v);
                   break;
                 }
 
-                case 0x30: { // IOUT_SET
+                case 0x30: { // IOUT_SET (accepted)
                   float a = 0.01f * ((float)x[2] + 256.0f * (float)x[3]);
-                  id(mw_target_current).publish_state(a);
+                  id(mw_target_current_accepted).publish_state(a);
+                  id(mw_target_i).publish_state(a);
                   break;
                 }
 
                 case 0x40: { // FAULT_STATUS
                   uint8_t b = x[2];
-                  id(mw_fault_fan_fail).publish_state((b & 0x01) != 0);
-                  id(mw_fault_otp).publish_state((b & 0x02) != 0);
-                  id(mw_fault_ovp).publish_state((b & 0x04) != 0);
-                  id(mw_fault_olp).publish_state((b & 0x08) != 0);
-                  id(mw_fault_short).publish_state((b & 0x10) != 0);
-                  id(mw_fault_ac_fail).publish_state((b & 0x20) != 0);
-                  id(mw_fault_op_off).publish_state((b & 0x40) != 0);
-                  id(mw_fault_hi_temp).publish_state((b & 0x80) != 0);
+                  id(mw_over_temperature).publish_state((b & 0x02) != 0);
+                  id(mw_output_over_voltage).publish_state((b & 0x04) != 0);
+                  id(mw_output_over_current).publish_state((b & 0x08) != 0);
+                  id(mw_output_short).publish_state((b & 0x10) != 0);
+                  id(mw_ac_abnormal).publish_state((b & 0x20) != 0);
+                  id(mw_output_turned_off).publish_state((b & 0x40) != 0);
+                  id(mw_internal_temperature_abnormal).publish_state((b & 0x80) != 0);
                   break;
                 }
 
@@ -618,7 +420,6 @@ canbus:
                   break;
                 }
 
-                // Curve values (F=0.01)
                 case 0xB0: { // CURVE_CC
                   float a = 0.01f * ((float)x[2] + 256.0f * (float)x[3]);
                   id(mw_curve_cc).publish_state(a);
@@ -638,82 +439,163 @@ canbus:
                 }
 
                 case 0xB4: { // CURVE_CONFIG
-                  id(mw_curve_config_low) = x[2];
-                  id(mw_curve_config_high) = x[3];
+                  id(mw_curve_low) = x[2];
+                  id(mw_curve_high) = x[3];
 
                   bool charger = (x[2] & 0x80) != 0;
-                  id(mw_cfg_charger_mode).publish_state(charger);
+                  id(mw_charger_mode).publish_state(charger);
                   id(mw_mode).publish_state(charger ? "Charger" : "PSU");
-
-                  id(mw_restart_enable).publish_state((x[3] & 0x08) != 0);
-                  id(mw_cc_timeout_enable).publish_state((x[3] & 0x01) != 0);
-                  id(mw_cv_timeout_enable).publish_state((x[3] & 0x02) != 0);
-                  id(mw_fv_timeout_enable).publish_state((x[3] & 0x04) != 0);
                   break;
                 }
 
-                // Timeouts (minutes)
-                case 0xB5: { // CURVE_CC_TIMEOUT
+                case 0xB5: { // CC timeout
                   int v = (int)x[2] + 256 * (int)x[3];
-                  id(mw_cc_timeout_min).publish_state((float)v);
+                  id(mw_cc_timeout).publish_state((float)v);
                   break;
                 }
-                case 0xB6: { // CURVE_CV_TIMEOUT
+
+                case 0xB6: { // CV timeout
                   int v = (int)x[2] + 256 * (int)x[3];
-                  id(mw_cv_timeout_min).publish_state((float)v);
+                  id(mw_cv_timeout).publish_state((float)v);
                   break;
                 }
-                case 0xB7: { // CURVE_FV_TIMEOUT
+
+                case 0xB7: { // FV timeout
                   int v = (int)x[2] + 256 * (int)x[3];
-                  id(mw_fv_timeout_min).publish_state((float)v);
+                  id(mw_fv_timeout).publish_state((float)v);
                   break;
                 }
 
                 case 0xB8: { // CHG_STATUS
-                  uint8_t low = x[2];
-                  uint8_t high = x[3];
-
-                  id(mw_chg_fully_charged).publish_state((low & 0x01) != 0);
-                  id(mw_chg_cc_mode).publish_state((low & 0x02) != 0);
-                  id(mw_chg_cv_mode).publish_state((low & 0x04) != 0);
-                  id(mw_chg_fv_mode).publish_state((low & 0x08) != 0);
-
-                  // WAKEUP_STOP: 0=wakeup finished, 1=wakeup not finished
-                  id(mw_chg_wakeup_unfinished).publish_state((low & 0x40) != 0);
-
-                  id(mw_chg_ntc_error).publish_state((high & 0x04) != 0);
-                  id(mw_chg_no_battery).publish_state((high & 0x08) != 0);
-
-                  id(mw_chg_cctof).publish_state((high & 0x20) != 0);
-                  id(mw_chg_cvtof).publish_state((high & 0x40) != 0);
-                  id(mw_chg_fvtof).publish_state((high & 0x80) != 0);
+                  id(mw_fully_charged).publish_state((x[2] & 0x01) != 0);
+                  id(mw_wake_up_unfinished).publish_state((x[2] & 0x20) != 0);
+                  id(mw_temp_comp_short).publish_state((x[3] & 0x04) != 0);
+                  id(mw_no_battery).publish_state((x[3] & 0x08) != 0);
                   break;
                 }
 
-                case 0xB9: { // CHG_RST_VBAT (F=0.01)
+                case 0xB9: { // CHG_RST_VBAT
                   float v = 0.01f * ((float)x[2] + 256.0f * (float)x[3]);
-                  id(mw_chg_rst_vbat).publish_state(v);
+                  id(mw_restart_v).publish_state(v);
                   break;
                 }
 
                 case 0xC1: { // SYSTEM_STATUS
                   uint8_t b = x[2];
-                  id(mw_sys_dc_ok).publish_state((b & 0x02) != 0);
-                  id(mw_sys_initial_state).publish_state((b & 0x20) != 0);
-                  id(mw_sys_eep_error).publish_state((b & 0x40) != 0);
+                  id(mw_dc_output_normal).publish_state((b & 0x02) != 0);
+                  id(mw_initial_state).publish_state((b & 0x20) != 0);
+                  id(mw_eeprom_access_error).publish_state((b & 0x40) != 0);
                   break;
                 }
 
                 case 0xC2: { // SYSTEM_CONFIG
-                  id(mw_system_config_low) = x[2];
-                  id(mw_system_config_high) = x[3];
+                  id(mw_sys_low) = x[2];
+                  id(mw_sys_high) = x[3];
 
-                  bool eep_off = (x[3] & 0x04) != 0;
-                  id(mw_cfg_eep_off).publish_state(eep_off);
-                  id(mw_eeprom_write_enabled).publish_state(!eep_off);
+                  bool disabled = (x[3] & 0x04) != 0;
+                  id(mw_disable_write_to_eeprom).publish_state(disabled);
+                  id(mw_eeprom_write_enabled).publish_state(!disabled);
                   break;
                 }
 
                 default:
                   break;
               }
+
+# ---------------- Polling (1s) ----------------
+interval:
+  - interval: 1s
+    then:
+      - canbus.send: { } # placeholder (не удаляй строку, ESPHome иногда ругается на пустой then)
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x00, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x20, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x30, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x40, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x60, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x61, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0x62, 0x00]
+      - delay: 50ms
+
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB0, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB1, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB2, 0x00]
+      - delay: 50ms
+
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB4, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB5, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB6, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB7, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB8, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xB9, 0x00]
+      - delay: 50ms
+
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xC1, 0x00]
+      - delay: 50ms
+      - canbus.send:
+          use_extended_id: true
+          can_id: 0xC0103
+          data: [0xC2, 0x00]

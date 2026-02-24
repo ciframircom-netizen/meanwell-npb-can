@@ -17,8 +17,6 @@ ota:
 api:
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
   ap:
     ssid: "NPB-CAN-Setup"
     password: "12345678"

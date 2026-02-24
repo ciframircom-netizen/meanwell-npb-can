@@ -45,19 +45,21 @@ globals:
     restore_value: no
     initial_value: '0x04'   # 0x04 => disable write to EEPROM (как в исходном проекте)
     
-sorting_groups:
-    - id: grp_sensor
-      name: "sensor"
-      sorting_weight: 1
-    - id: grp_seе_cr
-      name: "Управление зарядом"
-      sorting_weight: 2
-    - id: grp_seе-bp
-      name: "Управление БП"
-      sorting_weight: 3
-    - id: grp_err
-      name: "Ошибки"
-      sorting_weight: 4
+web_server:
+  version: 3
+  sorting_groups:
+     - id: grp_sensor
+       name: "sensor"
+       sorting_weight: 1
+     - id: grp_seе_cr
+       name: "Управление зарядом"
+       sorting_weight: 2
+     - id: grp_seе-bp
+       name: "Управление БП"
+       sorting_weight: 3
+     - id: grp_err
+       name: "Ошибки"
+       sorting_weight: 4
 # ---------------- A) Основные измерения (живые значения) ----------------
 sensor:
   - platform: template

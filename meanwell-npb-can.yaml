@@ -48,7 +48,7 @@ globals:
 # ---------------- A) Основные измерения (живые значения) ----------------
 sensor:
   - platform: template
-    name: "A1 Measured output voltage (V)"
+    name: "A01 Measured output voltage (V)"
     id: mw_measured_vout
     unit_of_measurement: "V"
     device_class: voltage
@@ -56,7 +56,7 @@ sensor:
     accuracy_decimals: 2
 
   - platform: template
-    name: "A2 Measured output current (A)"
+    name: "A02 Measured output current (A)"
     id: mw_measured_iout
     unit_of_measurement: "A"
     device_class: current
@@ -64,7 +64,7 @@ sensor:
     accuracy_decimals: 2
 
   - platform: template
-    name: "A3 Temperature (C)"
+    name: "A03 Temperature (C)"
     id: mw_temperature
     unit_of_measurement: "°C"
     device_class: temperature
@@ -72,7 +72,7 @@ sensor:
     accuracy_decimals: 1
 
   - platform: template
-    name: "A4 Target voltage accepted (V)"
+    name: "A04 Target voltage accepted (V)"
     id: mw_target_voltage_accepted
     unit_of_measurement: "V"
     device_class: voltage
@@ -80,18 +80,24 @@ sensor:
     accuracy_decimals: 2
 
   - platform: template
-    name: "A5 Target current accepted (A)"
+    name: "A05 Target current accepted (A)"
     id: mw_target_current_accepted
     unit_of_measurement: "A"
     device_class: current
     state_class: measurement
     accuracy_decimals: 2
 
+  - platform: template
+    name: "A99 ----------------"
+    id: mw_nul
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
 # ---------------- B) Управление ----------------
 switch:
   # B1. Charger ON/OFF
   - platform: template
-    name: "B1 Charger ON-OFF"
+    name: "B01 Charger ON-OFF"
     id: mw_power
     optimistic: true
     turn_on_action:
@@ -107,7 +113,7 @@ switch:
 
   # B7. EEPROM write enable/disable
   - platform: template
-    name: "B7 EEPROM write enabled"
+    name: "B07 EEPROM write enabled"
     id: mw_eeprom_write_enabled
     optimistic: true
     turn_on_action:
@@ -130,7 +136,7 @@ switch:
 # B8. Выбор режима Charger/PSU
 select:
   - platform: template
-    name: "B8 Mode (Charger-PSU)"
+    name: "B08 Mode (Charger-PSU)"
     id: mw_mode
     optimistic: true
     options:
@@ -150,7 +156,7 @@ select:
 number:
   # B2. Curve CV voltage (V)
   - platform: template
-    name: "B2 Curve CV voltage (V)"
+    name: "B02 Curve CV voltage (V)"
     id: mw_curve_cv
     unit_of_measurement: "V"
     optimistic: true
@@ -168,7 +174,7 @@ number:
 
   # B3. Curve CC current (A)
   - platform: template
-    name: "B3 Curve CC current (A)"
+    name: "B03 Curve CC current (A)"
     id: mw_curve_cc
     unit_of_measurement: "A"
     optimistic: true
@@ -186,7 +192,7 @@ number:
 
   # B4. Curve Float voltage (V)
   - platform: template
-    name: "B4 Curve Float voltage (V)"
+    name: "B04 Curve Float voltage (V)"
     id: mw_curve_fv
     unit_of_measurement: "V"
     optimistic: true
@@ -204,7 +210,7 @@ number:
 
   # B5. Recharge restart voltage (V)
   - platform: template
-    name: "B5 Recharge restart voltage (V)"
+    name: "B05 Recharge restart voltage (V)"
     id: mw_restart_v
     unit_of_measurement: "V"
     optimistic: true
@@ -222,7 +228,7 @@ number:
 
   # B6. Таймауты стадий (минуты)
   - platform: template
-    name: "B6-1 CC timeout (min)"
+    name: "B06-1 CC timeout (min)"
     id: mw_cc_timeout
     unit_of_measurement: "min"
     optimistic: true
@@ -239,7 +245,7 @@ number:
             return {0xB5, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
 
   - platform: template
-    name: "B6-2 CV timeout (min)"
+    name: "B06-2 CV timeout (min)"
     id: mw_cv_timeout
     unit_of_measurement: "min"
     optimistic: true
@@ -256,7 +262,7 @@ number:
             return {0xB6, 0x00, (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF)};
 
   - platform: template
-    name: "B6-3 FV timeout (min)"
+    name: "B06-3 FV timeout (min)"
     id: mw_fv_timeout
     unit_of_measurement: "min"
     optimistic: true
@@ -274,7 +280,7 @@ number:
 
   # -------- PSU (приятное дополнение) --------
   - platform: template
-    name: "B9 Target Voltage (PSU) (V)"
+    name: "B09 Target Voltage (PSU) (V)"
     id: mw_target_v
     unit_of_measurement: "V"
     optimistic: true
@@ -310,32 +316,32 @@ number:
 # ---------------- C) Состояния/флаги аварий и режима ----------------
 binary_sensor:
   - platform: template
-    name: "C1 FAULT: over temperature"
+    name: "C01 FAULT: over temperature"
     id: mw_over_temperature
   - platform: template
-    name: "C2 FAULT: output over voltage"
+    name: "C02 FAULT: output over voltage"
     id: mw_output_over_voltage
   - platform: template
-    name: "C3 FAULT: output over current"
+    name: "C03 FAULT: output over current"
     id: mw_output_over_current
   - platform: template
-    name: "C4 FAULT: output short circuited"
+    name: "C04 FAULT: output short circuited"
     id: mw_output_short_circuited
   - platform: template
-    name: "C5 FAULT: AC abnormal"
+    name: "C05 FAULT: AC abnormal"
     id: mw_ac_abnormal
   - platform: template
-    name: "C6 FAULT: output turned off"
+    name: "C06 FAULT: output turned off"
     id: mw_output_turned_off
   - platform: template
-    name: "C7 FAULT: internal temperature abnormal"
+    name: "C07 FAULT: internal temperature abnormal"
     id: mw_internal_temperature_abnormal
 
   - platform: template
-    name: "C8 CHG: fully charged"
+    name: "C08 CHG: fully charged"
     id: mw_fully_charged
   - platform: template
-    name: "C9 CHG: wake up unfinished"
+    name: "C09 CHG: wake up unfinished"
     id: mw_wake_up_unfinished
   - platform: template
     name: "C10 CHG: temperature compensation short circuited"

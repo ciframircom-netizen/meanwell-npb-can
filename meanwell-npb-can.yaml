@@ -506,7 +506,6 @@ canbus:
 interval:
   - interval: 1s
     then:
-      - canbus.send: { } # placeholder (не удаляй строку, ESPHome иногда ругается на пустой then)
       - canbus.send:
           use_extended_id: true
           can_id: 0xC0103

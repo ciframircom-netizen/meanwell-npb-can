@@ -44,55 +44,77 @@ globals:
     type: uint8_t
     restore_value: no
     initial_value: '0x04'   # 0x04 => disable write to EEPROM (как в исходном проекте)
-
+    
+sorting_groups:
+    - id: grp_sensor
+      name: "sensor"
+      sorting_weight: 1
+    - id: grp_seе_cr
+      name: "Управление зарядом"
+      sorting_weight: 2
+    - id: grp_seе-bp
+      name: "Управление БП"
+      sorting_weight: 3
+    - id: grp_err
+      name: "Ошибки"
+      sorting_weight: 4
 # ---------------- A) Основные измерения (живые значения) ----------------
 sensor:
   - platform: template
-    name: "A01 Measured output voltage (V)"
+    name: "Measured output voltage (V)"
     id: mw_measured_vout
     unit_of_measurement: "V"
     device_class: voltage
     state_class: measurement
     accuracy_decimals: 2
-
+    web_server:
+      sorting_group_id: grp_sensor
+      sorting_weight: 10
+      
   - platform: template
-    name: "A02 Measured output current (A)"
+    name: "Measured output current (A)"
     id: mw_measured_iout
     unit_of_measurement: "A"
     device_class: current
     state_class: measurement
     accuracy_decimals: 2
-
+    web_server:
+      sorting_group_id: grp_sensor
+      sorting_weight: 20
+      
   - platform: template
-    name: "A03 Temperature (C)"
+    name: "Temperature (C)"
     id: mw_temperature
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-
+    web_server:
+      sorting_group_id: grp_sensor
+      sorting_weight: 30
+      
   - platform: template
-    name: "A04 Target voltage accepted (V)"
+    name: "Target voltage accepted (V)"
     id: mw_target_voltage_accepted
     unit_of_measurement: "V"
     device_class: voltage
     state_class: measurement
     accuracy_decimals: 2
-
+    web_server:
+      sorting_group_id: grp_sensor
+      sorting_weight: 40
+      
   - platform: template
-    name: "A05 Target current accepted (A)"
+    name: "Target current accepted (A)"
     id: mw_target_current_accepted
     unit_of_measurement: "A"
     device_class: current
     state_class: measurement
     accuracy_decimals: 2
-
-  - platform: template
-    name: "A99 ----------------"
-    id: mw_nul
-    device_class: current
-    state_class: measurement
-    accuracy_decimals: 2
+    web_server:
+      sorting_group_id: grp_sensor
+      sorting_weight: 50
+      
 # ---------------- B) Управление ----------------
 switch:
   # B1. Charger ON/OFF

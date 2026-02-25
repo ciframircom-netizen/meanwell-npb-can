@@ -475,8 +475,8 @@ binary_sensor:
 # ---------------- CAN interface + parser ----------------
 canbus:
   - platform: esp32_can
-    tx_pin: GPIO7     # CTX
-    rx_pin: GPIO6     # CRX
+    tx_pin: GPIO5     # CTX
+    rx_pin: GPIO4     # CRX
     can_id: 0xC0003
     use_extended_id: true
     bit_rate: 250kbps
@@ -620,94 +620,94 @@ canbus:
 
 # ---------------- Polling (1s) ----------------
 interval:
-  - interval: 1s
+  - interval: 10s
     then:
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0x00, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0x20, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0x30, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0x40, 0x00]
-      - delay: 50ms
+#      - canbus.send:
+#          use_extended_id: true
+#          can_id: 0xC0103
+#          data: [0x00, 0x00]
+#      - delay: 50ms
+#      - canbus.send:
+#          use_extended_id: true
+#          can_id: 0xC0103
+#          data: [0x20, 0x00]
+#      - delay: 50ms
+#      - canbus.send:
+#          use_extended_id: true
+#          can_id: 0xC0103
+#          data: [0x30, 0x00]
+#      - delay: 50ms
+#      - canbus.send:
+#          use_extended_id: true
+#          can_id: 0xC0103
+#          data: [0x40, 0x00]
+#      - delay: 50ms
       - canbus.send:
           use_extended_id: true
           can_id: 0xC0103
           data: [0x60, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0x61, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0x62, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB0, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB1, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB2, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB4, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB5, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB6, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB7, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB8, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xB9, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xC1, 0x00]
-      - delay: 50ms
-      - canbus.send:
-          use_extended_id: true
-          can_id: 0xC0103
-          data: [0xC2, 0x00]
+#      - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0x61, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0x62, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0xB0, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0xB1, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0xB2, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0xB4, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0xB5, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0xB6, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+ #         use_extended_id: true
+ #         can_id: 0xC0103
+ #         data: [0xB7, 0x00]
+ #     - delay: 50ms
+ #     - canbus.send:
+#          use_extended_id: true
+#          can_id: 0xC0103
+#          data: [0xB8, 0x00]
+#      - delay: 50ms
+#      - canbus.send:
+#          use_extended_id: true
+#          can_id: 0xC0103
+#          data: [0xB9, 0x00]
+#      - delay: 50ms
+#      - canbus.send:
+#          use_extended_id: true
+#          can_id: 0xC0103
+#          data: [0xC1, 0x00]
+#      - delay: 50ms
+#      - canbus.send:
+#          use_extended_id: true
+#          can_id: 0xC0103
+#          data: [0xC2, 0x00]

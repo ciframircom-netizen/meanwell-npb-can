@@ -475,8 +475,8 @@ binary_sensor:
 # ---------------- CAN interface + parser ----------------
 canbus:
   - platform: esp32_can
-    tx_pin: GPIO5     # CTX
-    rx_pin: GPIO4     # CRX
+    tx_pin: GPIO05     # CTX
+    rx_pin: GPIO04     # CRX
     can_id: 0xC0003
     use_extended_id: true
     bit_rate: 250kbps

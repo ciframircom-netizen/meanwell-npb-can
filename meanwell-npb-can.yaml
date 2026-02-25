@@ -22,6 +22,23 @@ wifi:
 # Enable Home Assistant API
 api:
 
+web_server:
+  port: 80
+  version: 3
+  sorting_groups:
+     - id: grp_sensor
+       name: "sensor"
+       sorting_weight: 1
+     - id: grp_set_cr
+       name: "Управление зарядом"
+       sorting_weight: 2
+     - id: grp_set_bp
+       name: "Управление БП"
+       sorting_weight: 3
+     - id: grp_err
+       name: "Ошибки"
+       sorting_weight: 4
+
 # copy all of the contents below this line into your own esphome device ----------------
 
 # general design
